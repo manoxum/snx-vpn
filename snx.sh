@@ -93,12 +93,13 @@ Uso: snx [opção]
 
 Comandos disponíveis:
   snx                     Abre um shell bash dentro do container '${CONTAINER_NAME}'
+  snx connect|start|init  Inicializar a conexão snx
+  snx reconnect|restart   Remove e recria o container do zero
+  snx stop|disconnect     Para e remove o container
   snx ssh <args...>       Executa um comando SSH de dentro do container
   snx bind A:B            Adiciona um novo bind de porta (ex: snx bind 8080:80)
-  snx list-bind|binds     Mostra todos os binds de portas expostas
+  snx ports               Mostra todos os binds de portas expostas
   snx logs                Exibe os logs do container
-  snx stop                Para e remove o container
-  snx reconnect           Remove e recria o container do zero
   snx --help              Mostra esta mensagem de ajuda
 
 Exemplos:
@@ -122,6 +123,32 @@ case "$1" in
     fi
     echo "🔗 Conectando ao container ${CONTAINER_NAME} via bash..."
     docker exec -it "${CONTAINER_NAME}" bash
+    ;;
+
+  connect|start|init)
+    if container_exists; then
+      echo "❌ O container '${CONTAINER_NAME}' já existe."
+      echo "💡 Tudo pronto para usar o snx."
+      exit 1
+    fi
+    echo "♻️  Recriando container '${CONTAINER_NAME}'..."
+    run_container
+    ;;
+
+  reconnect|restart)
+    echo "♻️  Recriando container '${CONTAINER_NAME}'..."
+    mapfile -t current_binds < <(get_current_binds | grep -v '^$')
+    docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+    run_container "${current_binds[@]}"
+    ;;
+
+  stop|disconnect)
+    if ! container_exists; then
+      echo "⚠️  Nenhum container '${CONTAINER_NAME}' encontrado."
+      exit 0
+    fi
+    echo "🛑 Parando e removendo ${CONTAINER_NAME}..."
+    docker rm -f "${CONTAINER_NAME}"
     ;;
 
   ssh)
@@ -171,7 +198,7 @@ case "$1" in
     printf '  - %s\n' "${updated_binds[@]}"
     ;;
 
-  list-bind|binds)
+  ports)
     if ! container_exists; then
       echo "❌ O container '${CONTAINER_NAME}' não existe."
       exit 1
@@ -206,21 +233,7 @@ case "$1" in
     docker logs "${CONTAINER_NAME}"
     ;;
 
-  stop)
-    if ! container_exists; then
-      echo "⚠️  Nenhum container '${CONTAINER_NAME}' encontrado."
-      exit 0
-    fi
-    echo "🛑 Parando e removendo ${CONTAINER_NAME}..."
-    docker rm -f "${CONTAINER_NAME}"
-    ;;
 
-  reconnect)
-    echo "♻️  Recriando container '${CONTAINER_NAME}'..."
-    mapfile -t current_binds < <(get_current_binds | grep -v '^$')
-    docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-    run_container "${current_binds[@]}"
-    ;;
 
   --help|-h)
     show_help
