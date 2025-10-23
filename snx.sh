@@ -141,21 +141,27 @@ Uso: snx [opção]
 
 Comandos disponíveis:
   snx                     Abre um shell bash dentro do container '${CONTAINER_NAME}'
-  snx connect|start|init  Inicializar a conexão snx
-  snx reconnect|restart   Remove e recria o container do zero
+  snx connect|start|init  Inicializa e cria o container do zero
+  snx reconnect|restart   Remove e recria o container
   snx stop|disconnect     Para e remove o container
   snx ssh <args...>       Executa um comando SSH de dentro do container
   snx bind A:B            Adiciona um novo bind de porta (ex: snx bind 8080:80)
-  snx ports               Mostra todos os binds de portas expostas
+  snx expose              Coloca o container em host network (ignora binds)
+  snx ports               Mostra todos os binds de portas configuradas
   snx logs                Exibe os logs do container
-  snx --help              Mostra esta mensagem de ajuda
+  snx --help|-h           Mostra esta mensagem de ajuda
 
 Exemplos:
-  snx ssh user@10.0.0.5
-  snx bind 8080:80
-  snx reconnect
+  snx                     Abre um shell bash dentro do container
+  snx connect              Cria o container caso não exista
+  snx reconnect            Reinicia o container do zero
+  snx stop                 Para e remove o container
+  snx ssh user@10.0.0.5   Executa SSH dentro do container
+  snx bind 8080:80         Adiciona um bind de porta adicional
+  snx expose               Expondo container na host network
 EOF
 }
+
 
 # -------------------------
 # Execução principal
