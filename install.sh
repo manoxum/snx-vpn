@@ -3,6 +3,6 @@
 cd "$(dirname "$(readlink -f "$0")")"
 
 docker build -t inic-vpn .
-chmod +x run.sh
+chmod +x snx.sh
 rm -rf ~/.local/bin/snx
-ln -s $(pwd)/run.sh ~/.local/bin/snx
+ln -s $(pwd)/snx.sh ~/.local/bin/snx
