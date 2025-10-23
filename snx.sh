@@ -118,7 +118,7 @@ case "$1" in
   "")
     if ! container_exists; then
       echo "❌ O container '${CONTAINER_NAME}' não existe."
-      echo "💡 Use 'snx reconnect' para criá-lo novamente."
+      echo "💡 Use 'snx connect' para criá-lo novamente."
       exit 1
     fi
     echo "🔗 Conectando ao container ${CONTAINER_NAME} via bash..."
@@ -154,7 +154,7 @@ case "$1" in
   ssh)
     if ! container_exists; then
       echo "❌ O container '${CONTAINER_NAME}' não existe."
-      echo "💡 Use 'snx reconnect' para criá-lo novamente."
+      echo "💡 Use 'snx connect' para criá-lo novamente."
       exit 1
     fi
     shift
@@ -175,7 +175,7 @@ case "$1" in
     NEW_BIND="$1"
 
     if ! container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' não existe. Use 'snx reconnect' primeiro."
+      echo "❌ O container '${CONTAINER_NAME}' não existe. Use 'snx connect' primeiro."
       exit 1
     fi
 
