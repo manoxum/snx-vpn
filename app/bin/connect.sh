@@ -41,7 +41,7 @@ for attempt in $(seq 1 $MAX_ATTEMPTS); do
     fi
 
     echo "INFO: Waiting for VPN interface and routes..."
-    for i in {1..30}; do
+    for _i in {1..30}; do
         if check_vpn; then
             echo "INFO: VPN interface is up and routes applied."
             break 2
