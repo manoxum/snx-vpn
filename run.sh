@@ -1,3 +1,5 @@
+cd "$(dirname "$(readlink -f "$0")")"
+
 docker rm -f inic-vpn
 docker build -t inic-vpn .
 docker run --rm -it \
