@@ -21,6 +21,16 @@ get_current_binds() {
   docker inspect "${CONTAINER_NAME}" --format '{{range $p, $conf := .HostConfig.PortBindings}}{{(index $conf 0).HostPort}}:{{$p}}{{"\n"}}{{end}}' 2>/dev/null || true
 }
 
+unique_binds() {
+  declare -A seen
+  local bind
+  for bind in "$@"; do
+    seen["$bind"]=1
+  done
+  echo "${!seen[@]}"
+}
+
+
 # -------------------------
 # Função principal de run
 # -------------------------
@@ -44,6 +54,7 @@ run_container() {
     binds=("$SSH_BIND" "${binds[@]}")
   fi
 
+  binds=($(unique_binds "${SSH_BIND}" "${binds[@]}"))
   local ports_args=()
   for b in "${binds[@]}"; do
     ports_args+=(-p "$b")
@@ -63,6 +74,7 @@ run_container() {
     --name "${CONTAINER_NAME}" \
     "${IMAGE_NAME}"
 }
+
 
 # -------------------------
 # Ajuda
