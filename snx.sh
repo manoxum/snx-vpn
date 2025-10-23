@@ -164,7 +164,7 @@ Comandos disponíveis:
   snx stop|disconnect     Para e remove o container
   snx ssh <args...>       Executa um comando SSH de dentro do container
   snx bind A:B            Adiciona um novo bind de porta (ex: snx bind 8080:80)
-  snx expose              Coloca o container em host network (ignora binds)
+  snx expose on|off       Ativa ou desativa host network (ignora binds se ON)
   snx ports               Mostra todos os binds de portas configuradas
   snx logs                Exibe os logs do container
   snx --help|-h           Mostra esta mensagem de ajuda
@@ -176,7 +176,8 @@ Exemplos:
   snx stop                 Para e remove o container
   snx ssh user@10.0.0.5   Executa SSH dentro do container
   snx bind 8080:80         Adiciona um bind de porta adicional
-  snx expose               Expondo container na host network
+  snx expose on            Ativa host network (binds serão ignorados)
+  snx expose off           Volta a usar binds normais
 EOF
 }
 
