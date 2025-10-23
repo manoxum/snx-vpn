@@ -1,7 +1,6 @@
 # SNX VPN Container Manager 🚀
 
-[![Docker](https://img.shields.io/badge/Docker-Container-blue?logo=docker)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+&#x20;
 
 Um utilitário simples para gerenciar o container `snx-vpn` via Docker, com suporte a binds de portas, SSH e logs.
 
@@ -31,7 +30,11 @@ O script fará:
 > ⚠️ Certifique-se de que `~/.local/bin` esteja no seu PATH:
 >
 > ```bash
-> echo $PATH
+> ```
+
+echo \$PATH
+
+> ```
 > ```
 
 ---
@@ -42,17 +45,17 @@ Após a instalação, utilize o comando `snx` para gerenciar o container.
 
 ### 📋 Comandos disponíveis
 
-| Comando | Descrição |
-|---------|-----------|
-| `snx` | Abre um shell Bash dentro do container `snx-vpn`. |
-| `snx connect` / `snx start` / `snx init` | Inicializa e cria o container caso ainda não exista. |
-| `snx reconnect` / `snx restart` | Remove e recria o container, preservando binds configurados. |
-| `snx stop` / `snx disconnect` | Para e remove o container `snx-vpn`. |
-| `snx ssh <args...>` | Executa um comando SSH dentro do container. Ex: `snx ssh user@10.0.0.5`. |
-| `snx bind A:B` | Adiciona um novo bind de porta (ex: `snx bind 8080:80`) e recria o container. |
-| `snx ports` | Lista todos os binds de portas atuais do container. |
-| `snx logs` | Exibe os logs do container `snx-vpn`. |
-| `snx --help` | Mostra esta mensagem de ajuda detalhada. |
+| Comando                                  | Descrição                                                                     |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `snx`                                    | Abre um shell Bash dentro do container `snx-vpn`.                             |
+| `snx connect` / `snx start` / `snx init` | Inicializa e cria o container caso ainda não exista.                          |
+| `snx reconnect` / `snx restart`          | Remove e recria o container, preservando binds configurados.                  |
+| `snx stop` / `snx disconnect`            | Para e remove o container `snx-vpn`.                                          |
+| `snx ssh <args...>`                      | Executa um comando SSH dentro do container. Ex: `snx ssh user@10.0.0.5`.      |
+| `snx bind A:B`                           | Adiciona um novo bind de porta (ex: `snx bind 8080:80`) e recria o container. |
+| `snx ports`                              | Lista todos os binds de portas atuais do container.                           |
+| `snx logs`                               | Exibe os logs do container `snx-vpn`.                                         |
+| `snx --help`                             | Mostra esta mensagem de ajuda detalhada.                                      |
 
 ---
 
@@ -122,9 +125,3 @@ snx stop
 - SSH interno fácil
 - Logs acessíveis
 - Recriação segura do container
-
----
-
-## 💖 Feito com ❤️
-
-Para gerenciar facilmente seu container `snx-vpn`, sem complicações.
