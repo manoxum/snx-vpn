@@ -12,7 +12,6 @@ docker run --rm -it \
   --name inic-vpn \
   inic-vpn:latest
 
-sleep 3
 docker logs inic-vpn
 docker exec -it inic-vpn bash
 
