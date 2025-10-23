@@ -18,8 +18,19 @@ container_exists() {
 }
 
 get_current_binds() {
-  docker inspect "${CONTAINER_NAME}" --format '{{range $p, $conf := .HostConfig.PortBindings}}{{(index $conf 0).HostPort}}:{{$p}}{{"\n"}}{{end}}' 2>/dev/null || true
+  docker inspect "${CONTAINER_NAME}" \
+    --format '{{range $p, $conf := .HostConfig.PortBindings}}{{range $conf}}{{.HostPort}}:{{$p}}{{"\n"}}{{end}}{{end}}' 2>/dev/null || true
 }
+
+
+is_host_network() {
+  if ! container_exists; then
+    return 1
+  fi
+  mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")
+  [[ "$mode" == "host" ]]
+}
+
 
 unique_binds() {
   declare -A seen
@@ -35,7 +46,19 @@ unique_binds() {
 # Função principal de run
 # -------------------------
 run_container() {
-  local binds=("$@")
+local new_binds=("$@")       # argumentos passados para a função
+  local binds=()
+
+  if container_exists; then
+    # Recupera binds antigos
+    mapfile -t binds < <(get_current_binds | grep -v '^$')
+  fi
+
+  # Adiciona novos binds passados como parâmetro
+  for b in "${new_binds[@]}"; do
+    binds+=("$b")
+  done
+
 
   # Garante SSH_BIND válido
   local SSH_BIND
@@ -69,13 +92,38 @@ run_container() {
     ports_args+=(-p "$b")
   done
 
+  # Detecta se devemos usar host network
+  # Detecta se container atual está em host network
+  if container_exists; then
+      mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")
+      if [[ "$mode" == "host" ]]; then
+          export HOST_EXPOSED=true
+      fi
+  fi
+
+
+  # Prepara argumentos de rede
+  network_args=()
+  if [[ "$HOST_EXPOSED" == true ]]; then
+      echo "🌐 Mantendo container na host network"
+      network_args=(--network host)
+      ports_args=()   # ignora binds
+  fi
+
+
   echo "🚀 Iniciando container '${CONTAINER_NAME}' com binds:"
   printf '  - %s\n' "${binds[@]}"
+
+  if container_exists; then
+    # Remover o continer aterior
+    docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+  fi
 
   docker run --rm -it \
     --privileged \
     --cap-add=NET_ADMIN \
     "${ports_args[@]}" \
+    "${network_args[@]}" \
     -d \
     -v /lib/modules:/lib/modules:ro \
     --device /dev/net/tun \
@@ -137,9 +185,7 @@ case "$1" in
 
   reconnect|restart)
     echo "♻️  Recriando container '${CONTAINER_NAME}'..."
-    mapfile -t current_binds < <(get_current_binds | grep -v '^$')
-    docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
-    run_container "${current_binds[@]}"
+    run_container
     ;;
 
   stop|disconnect)
@@ -181,22 +227,27 @@ case "$1" in
 
     echo "🔎 Obtendo binds atuais..."
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
-
     if [[ " ${current_binds[*]} " == *" $NEW_BIND "* ]]; then
       echo "⚠️  O bind $NEW_BIND já existe."
       exit 0
     fi
 
     echo "➕ Adicionando novo bind: $NEW_BIND"
-    updated_binds=("${current_binds[@]}" "$NEW_BIND")
+    updated_binds=("$NEW_BIND" )
 
     echo "♻️  Recriando container com binds atualizados..."
-    docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
     run_container "${updated_binds[@]}"
 
     echo "✅ Novo bind aplicado:"
     printf '  - %s\n' "${updated_binds[@]}"
     ;;
+
+  expose)
+      echo "🌐 Expondo container na host network..."
+      export HOST_EXPOSED=true
+      run_container
+      echo "✅ Container '${CONTAINER_NAME}' agora está usando a host network"
+      ;;
 
   ports)
     if ! container_exists; then
@@ -207,11 +258,15 @@ case "$1" in
     echo "🔎 Binds atuais do container '${CONTAINER_NAME}':"
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
 
-    # Garante que SSH_BIND apareça se não estiver presente
+    # Adiciona SSH_BIND se ainda não estiver presente
     SSH_BIND=$(get_env_var "SSH_BIND")
     if [[ -n "$SSH_BIND" && ! " ${current_binds[*]} " =~ " $SSH_BIND " ]]; then
       current_binds=("$SSH_BIND" "${current_binds[@]}")
     fi
+
+    # Mantém todos os binds como estão, sem filtrar
+    # current_binds=("${current_binds[@]}")
+
 
     if [ ${#current_binds[@]} -eq 0 ]; then
       echo "⚠️  Nenhum bind configurado."
