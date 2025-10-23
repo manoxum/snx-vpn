@@ -15,8 +15,6 @@ for var in VPN_GETWAI VPN_USERNAME VPN_PASSWORD; do
     fi
 done
 
-echo $VPN_GETWAI: $VPN_GETWAI VPN_USERNAME: $VPN_USERNAME VPN_PASSWORD: $VPN_PASSWORD
-
 # Função para verificar se a VPN está funcional
 check_vpn() {
     VPN_IFACE=$(ip -4 addr | awk '/172\.16\./ {print $NF; exit}')
