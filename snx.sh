@@ -31,15 +31,25 @@ is_host_network() {
   [[ "$mode" == "host" ]]
 }
 
+ensure_container_exists() {
+  if ! container_exists; then
+    echo "❌ O container '${CONTAINER_NAME}' não existe."
+    echo "💡 Use 'snx connect' para criá-lo."
+    exit 1
+  fi
+}
+
 
 unique_binds() {
   declare -A seen
-  local bind bind_key
+  local result=()
   for bind in "$@"; do
-    bind_key="${bind%%/*}"   # remove /tcp ou /udp
-    seen["$bind_key"]=1
+    if [[ -z "${seen[$bind]}" ]]; then
+      seen[$bind]=1
+      result+=("$bind")
+    fi
   done
-  echo "${!seen[@]}"
+  echo "${result[@]}"
 }
 
 # -------------------------
@@ -94,17 +104,25 @@ local new_binds=("$@")       # argumentos passados para a função
 
   # Detecta se devemos usar host network
   # Detecta se container atual está em host network
-  if container_exists; then
-      mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")
-      if [[ "$mode" == "host" ]]; then
-          export HOST_EXPOSED=true
+  # Só define HOST_EXPOSED se ainda não estiver definido
+  if [[ -z "$HOST_EXPOSED" ]]; then
+      if container_exists; then
+          mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")
+          if [[ "$mode" == "host" ]]; then
+              export HOST_EXPOSED=on
+          else
+              export HOST_EXPOSED=off
+          fi
+      else
+          export HOST_EXPOSED=off
       fi
   fi
 
 
+
   # Prepara argumentos de rede
   network_args=()
-  if [[ "$HOST_EXPOSED" == true ]]; then
+  if [[ "$HOST_EXPOSED" == on ]]; then
       echo "🌐 Mantendo container na host network"
       network_args=(--network host)
       ports_args=()   # ignora binds
@@ -170,11 +188,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 case "$1" in
   "")
-    if ! container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' não existe."
-      echo "💡 Use 'snx connect' para criá-lo novamente."
-      exit 1
-    fi
+    ensure_container_exists
     echo "🔗 Conectando ao container ${CONTAINER_NAME} via bash..."
     docker exec -it "${CONTAINER_NAME}" bash
     ;;
@@ -204,11 +218,7 @@ case "$1" in
     ;;
 
   ssh)
-    if ! container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' não existe."
-      echo "💡 Use 'snx connect' para criá-lo novamente."
-      exit 1
-    fi
+    ensure_container_exists
     shift
     if [ $# -eq 0 ]; then
       echo "⚠️  Nenhum comando SSH especificado. Exemplo: snx ssh user@10.0.0.5"
@@ -226,10 +236,7 @@ case "$1" in
     fi
     NEW_BIND="$1"
 
-    if ! container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' não existe. Use 'snx connect' primeiro."
-      exit 1
-    fi
+    ensure_container_exists
 
     echo "🔎 Obtendo binds atuais..."
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
@@ -239,27 +246,36 @@ case "$1" in
     fi
 
     echo "➕ Adicionando novo bind: $NEW_BIND"
-    updated_binds=("$NEW_BIND" )
+    binds=("$NEW_BIND")
 
     echo "♻️  Recriando container com binds atualizados..."
-    run_container "${updated_binds[@]}"
+    run_container "${binds[@]}"
 
     echo "✅ Novo bind aplicado:"
-    printf '  - %s\n' "${updated_binds[@]}"
+    printf '  - %s\n' "${binds[@]}"
     ;;
 
   expose)
-      echo "🌐 Expondo container na host network..."
-      export HOST_EXPOSED=true
-      run_container
-      echo "✅ Container '${CONTAINER_NAME}' agora está usando a host network"
+      if [[ "$2" == "on" ]]; then
+          echo "🌐 Ativando host network..."
+          export HOST_EXPOSED=on
+          run_container
+          echo "✅ Container agora está usando host network. Binds serão ignorados."
+          echo "⚠️  Host network ativa, todos os binds de porta serão ignorados."
+      elif [[ "$2" == "off" ]]; then
+          echo "🌐 Desativando host network..."
+          export HOST_EXPOSED=off
+          run_container
+          echo "✅ Container agora usa binds normais."
+      else
+          echo "❌ Uso incorreto: snx expose on|off"
+          exit 1
+      fi
       ;;
 
+
   ports)
-    if ! container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' não existe."
-      exit 1
-    fi
+    ensure_container_exists
 
     echo "🔎 Binds atuais do container '${CONTAINER_NAME}':"
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
@@ -286,10 +302,7 @@ case "$1" in
     ;;
 
   logs)
-    if ! container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' não existe."
-      exit 1
-    fi
+    ensure_container_exists
     echo "📜 Exibindo logs de ${CONTAINER_NAME}..."
     docker logs "${CONTAINER_NAME}"
     ;;
