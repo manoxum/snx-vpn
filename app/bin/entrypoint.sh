@@ -3,6 +3,9 @@ set -e
 
 FLAG_FILE="/app/.setup_done"
 
+SSH_USER="${SNX_SSH_USER:-ssh}"
+SSH_PASSWORD="${SNX_SSH_PASSWORD:-Secret}"
+
 # Executa setup.sh apenas se nunca foi executado
 if [ ! -f "$FLAG_FILE" ]; then
     /app/bin/setup.sh

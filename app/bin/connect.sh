@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # connect-no-expect.sh - Conecta SNX sem usar Expect
 # Variáveis de ambiente necessárias:
-#   VPN_GETWAI  -> Gateway SNX (ex: vpn.gov.st)
-#   VPN_USERNAME -> Usuário SNX
-#   VPN_PASSWORD -> Senha SNX
+#   SNX_VPN_GETWAI  -> Gateway SNX (ex: vpn.gov.st)
+#   SNX_VPN_USERNAME -> Usuário SNX
+#   SNX_VPN_PASSWORD -> Senha SNX
 
 set -euo pipefail
 
 # Verifica se todas as variáveis foram definidas
-for var in VPN_GETWAI VPN_USERNAME VPN_PASSWORD; do
+for var in SNX_VPN_GETWAI SNX_VPN_USERNAME SNX_VPN_PASSWORD; do
     if [ -z "${!var:-}" ]; then
         echo "ERROR: Variable $var not set"
         exit 1
@@ -30,14 +30,14 @@ MAX_ATTEMPTS=3
 for attempt in $(seq 1 $MAX_ATTEMPTS); do
     echo "INFO: Attempt $attempt to connect SNX..."
 
-    if pgrep -f "snx.*-s $VPN_GETWAI" > /dev/null; then
+    if pgrep -f "snx.*-s $SNX_VPN_GETWAI" > /dev/null; then
         echo "INFO: SNX session already running, skipping login..."
     else
         # Conecta SNX usando stdin para senha e aceitar certificado
         {
-            echo "${VPN_PASSWORD}"  # senha
+            echo "${SNX_VPN_PASSWORD}"  # senha
             echo "y"               # aceitar certificado
-        } | snx -s "$VPN_GETWAI" -u "$VPN_USERNAME"
+        } | snx -s "$SNX_VPN_GETWAI" -u "$SNX_VPN_USERNAME"
     fi
 
     echo "INFO: Waiting for VPN interface and routes..."

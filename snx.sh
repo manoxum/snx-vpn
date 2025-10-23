@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -e
 
-CONTAINER_NAME="inic-vpn"
-IMAGE_NAME="inic-vpn:latest"
-ENV_FILE=".env.local"
+cd "$(dirname "$(readlink -f "$0")")"
 
-# -------------------------
-# Funções auxiliares
-# -------------------------
+ENV_FILE=".env.local"
 get_env_var() {
   local var_name="$1"
   grep -E "^${var_name}=" "${ENV_FILE}" 2>/dev/null | tail -n1 | cut -d '=' -f2-
 }
+
+DEFAULT_CONTAINER_NAME=$(get_env_var "SNX_NAME")
+DEFAULT_CONTAINER_IMAGE=$(get_env_var "SNX_IMAGE")
+CONTAINER_NAME=${DEFAULT_CONTAINER_NAME:-snx}
+IMAGE_NAME=${DEFAULT_CONTAINER_IMAGE:-snx}
+
+# -------------------------
+# Funções auxiliares
+# -------------------------
+
 
 container_exists() {
   docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"

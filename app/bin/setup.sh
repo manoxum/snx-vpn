@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-SSH_USER="${SSH_USER:-ssh}"
-SSH_PASSWORD="${SSH_PASSWORD:-Secret}"
+SSH_USER="${SNX_SSH_USER:-ssh}"
+SSH_PASSWORD="${SNX_SSH_PASSWORD:-Secret}"
 
 # Cria usuário apenas se não existir, adicionando ao grupo ssh existente
 if ! id "$SSH_USER" &>/dev/null; then
