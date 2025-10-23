@@ -9,10 +9,12 @@ get_env_var() {
   grep -E "^${var_name}=" "${ENV_FILE}" 2>/dev/null | tail -n1 | cut -d '=' -f2-
 }
 
-DEFAULT_CONTAINER_NAME=$(get_env_var "SNX_NAME")
-DEFAULT_CONTAINER_IMAGE=$(get_env_var "SNX_IMAGE")
-CONTAINER_NAME=${DEFAULT_CONTAINER_NAME:-snx}
-IMAGE_NAME=${DEFAULT_CONTAINER_IMAGE:-snx}
+SNX_NAME=$(get_env_var "SNX_NAME")
+SNX_IMAGE=$(get_env_var "SNX_IMAGE")
+SNX_SSH_BIND=$(get_env_var "SNX_SSH_BIND")
+CONTAINER_NAME=${SNX_NAME:-snx}
+IMAGE_NAME=${SNX_IMAGE:-snx}
+SSH_BIND=${SNX_SSH_BIND:-"2222"}
 
 # -------------------------
 # Funções auxiliares
@@ -77,13 +79,11 @@ local new_binds=("$@")       # argumentos passados para a função
 
 
   # Garante SSH_BIND válido
-  local SSH_BIND
-  SSH_BIND=$(get_env_var "SSH_BIND")
   if [[ -z "$SSH_BIND" ]]; then
     echo "⚠️  Variável SSH_BIND não definida em ${ENV_FILE}, usando 2222:22 por padrão."
     SSH_BIND="2222:22"
   fi
-  if [[ ! "$SSH_BIND" =~ ^[0-9]+:[0-9]+$ ]]; then
+  if [[ ! "$SSH_BIND" =~ ^[0-9]+$ ]]; then
     echo "❌ SSH_BIND inválido em ${ENV_FILE}. Use o formato HOST:CONTAINER (ex: 2222:22)."
     exit 1
   fi
@@ -96,7 +96,7 @@ local new_binds=("$@")       # argumentos passados para a função
 
   # Adiciona SSH_BIND se ainda não estiver presente
   if [[ ! " ${normalized_binds[*]} " =~ " ${SSH_BIND} " ]]; then
-    binds=("$SSH_BIND" "${binds[@]}")
+    binds=("$SSH_BIND:22" "${binds[@]}")
   fi
 
   # Remove duplicatas de forma segura
