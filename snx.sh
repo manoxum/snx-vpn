@@ -23,13 +23,13 @@ get_current_binds() {
 
 unique_binds() {
   declare -A seen
-  local bind
+  local bind bind_key
   for bind in "$@"; do
-    seen["$bind"]=1
+    bind_key="${bind%%/*}"   # remove /tcp ou /udp
+    seen["$bind_key"]=1
   done
   echo "${!seen[@]}"
 }
-
 
 # -------------------------
 # Função principal de run
@@ -37,7 +37,7 @@ unique_binds() {
 run_container() {
   local binds=("$@")
 
-  # Garante que SSH_BIND sempre exista e seja válido
+  # Garante SSH_BIND válido
   local SSH_BIND
   SSH_BIND=$(get_env_var "SSH_BIND")
   if [[ -z "$SSH_BIND" ]]; then
@@ -49,12 +49,21 @@ run_container() {
     exit 1
   fi
 
-  # Se ainda não estiver presente na lista de binds, adiciona
-  if [[ ! " ${binds[*]} " =~ " ${SSH_BIND} " ]]; then
+  # Normaliza binds atuais
+  normalized_binds=()
+  for b in "${binds[@]}"; do
+    normalized_binds+=("${b%%/*}")
+  done
+
+  # Adiciona SSH_BIND se ainda não estiver presente
+  if [[ ! " ${normalized_binds[*]} " =~ " ${SSH_BIND} " ]]; then
     binds=("$SSH_BIND" "${binds[@]}")
   fi
 
-  binds=($(unique_binds "${SSH_BIND}" "${binds[@]}"))
+  # Remove duplicatas de forma segura
+  binds=($(unique_binds "${binds[@]}"))
+
+  # Prepara argumentos -p
   local ports_args=()
   for b in "${binds[@]}"; do
     ports_args+=(-p "$b")
@@ -75,7 +84,6 @@ run_container() {
     "${IMAGE_NAME}"
 }
 
-
 # -------------------------
 # Ajuda
 # -------------------------
@@ -87,7 +95,7 @@ Comandos disponíveis:
   snx                     Abre um shell bash dentro do container '${CONTAINER_NAME}'
   snx ssh <args...>       Executa um comando SSH de dentro do container
   snx bind A:B            Adiciona um novo bind de porta (ex: snx bind 8080:80)
-  snx list-bind|binds     Monstra todos os binds de portas expostas
+  snx list-bind|binds     Mostra todos os binds de portas expostas
   snx logs                Exibe os logs do container
   snx stop                Para e remove o container
   snx reconnect           Remove e recria o container do zero
@@ -163,32 +171,31 @@ case "$1" in
     printf '  - %s\n' "${updated_binds[@]}"
     ;;
 
-    list-bind|binds)
-      if ! container_exists; then
-        echo "❌ O container '${CONTAINER_NAME}' não existe."
-        exit 1
-      fi
+  list-bind|binds)
+    if ! container_exists; then
+      echo "❌ O container '${CONTAINER_NAME}' não existe."
+      exit 1
+    fi
 
-      echo "🔎 Binds atuais do container '${CONTAINER_NAME}':"
-      mapfile -t current_binds < <(get_current_binds | grep -v '^$')
+    echo "🔎 Binds atuais do container '${CONTAINER_NAME}':"
+    mapfile -t current_binds < <(get_current_binds | grep -v '^$')
 
-      # Garante que o SSH_BIND também apareça se não estiver mapeado (por segurança)
-      SSH_BIND=$(get_env_var "SSH_BIND")
-      if [[ -n "$SSH_BIND" && ! " ${current_binds[*]} " =~ " $SSH_BIND " ]]; then
-        current_binds=("$SSH_BIND" "${current_binds[@]}")
-      fi
+    # Garante que SSH_BIND apareça se não estiver presente
+    SSH_BIND=$(get_env_var "SSH_BIND")
+    if [[ -n "$SSH_BIND" && ! " ${current_binds[*]} " =~ " $SSH_BIND " ]]; then
+      current_binds=("$SSH_BIND" "${current_binds[@]}")
+    fi
 
-      if [ ${#current_binds[@]} -eq 0 ]; then
-        echo "⚠️  Nenhum bind configurado."
-      else
-        for b in "${current_binds[@]}"; do
-          host_port="${b%%:*}"
-          container_port="${b##*:}"
-          echo "  $host_port → $container_port"
-        done
-      fi
-      ;;
-
+    if [ ${#current_binds[@]} -eq 0 ]; then
+      echo "⚠️  Nenhum bind configurado."
+    else
+      for b in "${current_binds[@]}"; do
+        host_port="${b%%:*}"
+        container_port="${b##*:}"
+        echo "  $host_port → $container_port"
+      done
+    fi
+    ;;
 
   logs)
     if ! container_exists; then
