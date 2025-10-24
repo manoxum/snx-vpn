@@ -5,24 +5,24 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 ENV_FILE=".env.local"
 # ----------------------------------------
-# Carrega variáveis do arquivo .env.local
+# Load variables from the .env.local file
 # ----------------------------------------
 if [[ -f "${ENV_FILE}" ]]; then
-  # Exporta todas as variáveis declaradas dentro do arquivo
+  # Export all variables declared in the file
   set -o allexport
   source "${ENV_FILE}"
   set +o allexport
 else
-  echo "⚠️  Arquivo ${ENV_FILE} não encontrado. Usando valores padrão."
+  echo "⚠️  File ${ENV_FILE} not found. Using default values."
 fi
 
-# Define variáveis com fallback
+# Define variables with fallback
 CONTAINER_NAME="${SNX_NAME:-snx}"
 IMAGE_NAME="${SNX_IMAGE:-snx}"
 SSH_BIND="${SNX_SSH_BIND:-2222}"
 
 # -------------------------
-# Funções auxiliares
+# Helper functions
 # -------------------------
 
 
@@ -48,8 +48,8 @@ is_host_network() {
 
 ensure_container_exists() {
   if ! container_exists; then
-    echo "❌ O container '${CONTAINER_NAME}' não existe."
-    echo "💡 Use 'snx connect' para criá-lo."
+    echo "❌ Container '${CONTAINER_NAME}' does not exist."
+    echo "💡 Use 'snx connect' to create it."
     exit 1
   fi
 }
@@ -68,59 +68,57 @@ unique_binds() {
 }
 
 # -------------------------
-# Função principal de run
+# Main run function
 # -------------------------
 run_container() {
-local new_binds=("$@")       # argumentos passados para a função
+local new_binds=("$@")       # arguments passed to the function
   local binds=()
 
   if container_exists; then
-    # Recupera binds antigos
+    # Get old binds
     mapfile -t binds < <(get_current_binds | grep -v '^$')
   fi
 
-  # Adiciona novos binds passados como parâmetro
+  # Add new binds passed as parameters
   for b in "${new_binds[@]}"; do
     binds+=("$b")
   done
 
 
-   # Validação e fallback de SSH_BIND
+   # Validate and fallback SSH_BIND
    if [[ -z "$SSH_BIND" ]]; then
-     echo "⚠️  Variável SNX_SSH_BIND não definida em ${ENV_FILE}, usando 2222 por padrão."
+     echo "⚠️  SNX_SSH_BIND variable not set in ${ENV_FILE}, using 2222 as default."
      SSH_BIND=2222
    fi
    if [[ ! "$SSH_BIND" =~ ^[0-9]+$ ]]; then
-     echo "❌ Valor inválido para SNX_SSH_BIND em ${ENV_FILE}. Use apenas o número da porta externa (ex: 2222)."
+     echo "❌ Invalid value for SNX_SSH_BIND in ${ENV_FILE}. Use only the external port number (e.g., 2222)."
      exit 1
    fi
 
-   # Monta o bind SSH completo
+   # Build the full SSH bind
    local ssh_port_bind="${SSH_BIND}:22"
 
-  # Normaliza binds atuais
+  # Normalize current binds
   normalized_binds=()
   for b in "${binds[@]}"; do
     normalized_binds+=("${b%%/*}")
   done
 
-  # Adiciona o bind SSH se ainda não existir
+  # Add SSH bind if not already present
   if [[ ! " ${normalized_binds[*]} " =~ " ${SSH_BIND}:" ]]; then
     binds=("$ssh_port_bind" "${binds[@]}")
   fi
 
-  # Remove duplicatas de forma segura
+  # Remove duplicates safely
   binds=($(unique_binds "${binds[@]}"))
 
-  # Prepara argumentos -p
+  # Prepare -p arguments
   local ports_args=()
   for b in "${binds[@]}"; do
     ports_args+=(-p "$b")
   done
 
-  # Detecta se devemos usar host network
-  # Detecta se container atual está em host network
-  # Só define HOST_EXPOSED se ainda não estiver definido
+  # Detect if we should use host network
   if [[ -z "$HOST_EXPOSED" ]]; then
       if container_exists; then
           mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}")
@@ -134,22 +132,20 @@ local new_binds=("$@")       # argumentos passados para a função
       fi
   fi
 
-
-
-  # Prepara argumentos de rede
+  # Prepare network arguments
   network_args=()
   if [[ "$HOST_EXPOSED" == on ]]; then
-      echo "🌐 Mantendo container na host network"
+      echo "🌐 Keeping container on host network"
       network_args=(--network host)
-      ports_args=()   # ignora binds
+      ports_args=()   # ignore binds
   fi
 
 
-  echo "🚀 Iniciando container '${CONTAINER_NAME}' com binds:"
+  echo "🚀 Starting container '${CONTAINER_NAME}' with binds:"
   printf '  - %s\n' "${binds[@]}"
 
   if container_exists; then
-    # Remover o continer aterior
+    # Remove previous container
     docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
   fi
 
@@ -167,107 +163,106 @@ local new_binds=("$@")       # argumentos passados para a função
 }
 
 # -------------------------
-# Ajuda
+# Help
 # -------------------------
 show_help() {
   cat <<EOF
-Uso: snx [comando] [opções]
+Usage: snx [command] [options]
 
-Comandos disponíveis:
+Available commands:
 
-  snx                     Abre um shell bash dentro do container '${CONTAINER_NAME}'
-  snx connect|start|init  Inicializa e cria o container do zero
-  snx reconnect|restart   Remove e recria o container
-  snx stop|disconnect     Para e remove o container
-  snx ssh <args...>       Executa um comando SSH de dentro do container
-  snx bind A:B            Adiciona um novo bind de porta (ex: snx bind 8080:80)
-  snx expose on|off       Ativa ou desativa host network (ignora binds se ON)
-  snx ports               Mostra todos os binds de portas configuradas
-  snx logs                Exibe os logs do container
-  snx status              Mostra informações detalhadas sobre o container
-  snx --help|-h           Mostra esta mensagem de ajuda
+  snx                     Open a bash shell inside container '${CONTAINER_NAME}'
+  snx connect|start|init  Initialize and create the container from scratch
+  snx reconnect|restart   Remove and recreate the container
+  snx stop|disconnect     Stop and remove the container
+  snx ssh <args...>       Execute an SSH command inside the container
+  snx bind A:B            Add a new port bind (e.g., snx bind 8080:80)
+  snx expose on|off       Enable or disable host network (ignores binds if ON)
+  snx ports               Show all configured port binds
+  snx logs                Show container logs
+  snx status              Show detailed information about the container
+  snx --help|-h           Show this help message
 
-Exemplos:
+Examples:
 
   snx
-      Abre um shell bash dentro do container.
+      Open a bash shell inside the container.
 
   snx connect
-      Cria o container caso não exista.
+      Create the container if it does not exist.
 
   snx reconnect
-      Reinicia o container do zero.
+      Recreate the container from scratch.
 
   snx stop
-      Para e remove o container.
+      Stop and remove the container.
 
   snx ssh user@10.0.0.5
-      Executa SSH dentro do container.
+      Execute SSH inside the container.
 
   snx bind 8080:80
-      Adiciona um bind de porta adicional.
+      Add an additional port bind.
 
   snx expose on
-      Ativa host network (binds serão ignorados).
+      Enable host network (binds will be ignored).
 
   snx expose off
-      Volta a usar binds normais.
+      Use normal binds again.
 
   snx ports
-      Lista todas as portas configuradas atualmente.
+      List all currently configured ports.
 
   snx logs
-      Exibe logs do container.
+      Show container logs.
 
   snx status
-      Exibe detalhes completos do container, incluindo:
-        - Imagem em uso
-        - Status de execução
-        - Rede e portas expostas
-        - Montagens de volumes
+      Show full container details, including:
+        - Image in use
+        - Running status
+        - Network mode and exposed ports
+        - Volume mounts
 
-Notas:
-  - Todas as variáveis do arquivo '.env.local' são carregadas automaticamente.
-  - SNX_SSH_BIND define a porta SSH externa (padrão: 2222).
-  - HOST_EXPOSED controla se o container usa host network (ignora binds se 'on').
+Notes:
+  - All variables from '.env.local' are automatically loaded.
+  - SNX_SSH_BIND defines the external SSH port (default: 2222).
+  - HOST_EXPOSED controls whether the container uses host network (ignores binds if 'on').
 
 EOF
 }
 
-
 # -------------------------
-# Execução principal
+# Main execution
 # -------------------------
 cd "$(dirname "$(readlink -f "$0")")"
 
 case "$1" in
   "")
     ensure_container_exists
-    echo "🔗 Conectando ao container ${CONTAINER_NAME} via bash..."
+    echo "🔗 Connecting to container ${CONTAINER_NAME} via bash..."
     docker exec -it "${CONTAINER_NAME}" bash
     ;;
 
   connect|start|init)
     if container_exists; then
-      echo "❌ O container '${CONTAINER_NAME}' já existe."
-      echo "💡 Tudo pronto para usar o snx."
+      echo "❌ Container '${CONTAINER_NAME}' already exists."
+      echo "💡 Ready to use snx."
       exit 1
     fi
-    echo "♻️  Recriando container '${CONTAINER_NAME}'..."
+    echo "♻️  Recreating container '${CONTAINER_NAME}'..."
     run_container
     ;;
 
   reconnect|restart)
-    echo "♻️  Recriando container '${CONTAINER_NAME}'..."
+    echo "♻️  Recreating container '${CONTAINER_NAME}'..."
     run_container
     ;;
 
   stop|disconnect)
     if ! container_exists; then
-      echo "⚠️  Nenhum container '${CONTAINER_NAME}' encontrado."
+      echo "⚠️  No container '${CONTAINER_NAME}' found."
       exit 0
     fi
-    echo "🛑 Parando e removendo ${CONTAINER_NAME}..."
+    echo "🛑 Stopping and removing ${CONTAINER_NAME}..."
     docker rm -f "${CONTAINER_NAME}"
     ;;
 
@@ -275,76 +270,71 @@ case "$1" in
     ensure_container_exists
     shift
     if [ $# -eq 0 ]; then
-      echo "⚠️  Nenhum comando SSH especificado. Exemplo: snx ssh user@10.0.0.5"
+      echo "⚠️  No SSH command specified. Example: snx ssh user@10.0.0.5"
       exit 1
     fi
-    echo "🔐 Executando SSH dentro do container (${CONTAINER_NAME}) → ssh $*"
+    echo "🔐 Executing SSH inside the container (${CONTAINER_NAME}) → ssh $*"
     docker exec -it "${CONTAINER_NAME}" ssh -- "$@"
     ;;
 
   bind)
     shift
     if [ $# -ne 1 ]; then
-      echo "❌ Uso incorreto. Exemplo: snx bind 8080:80"
+      echo "❌ Incorrect usage. Example: snx bind 8080:80"
       exit 1
     fi
     NEW_BIND="$1"
 
     ensure_container_exists
 
-    echo "🔎 Obtendo binds atuais..."
+    echo "🔎 Getting current binds..."
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
     if [[ " ${current_binds[*]} " == *" $NEW_BIND "* ]]; then
-      echo "⚠️  O bind $NEW_BIND já existe."
+      echo "⚠️  Bind $NEW_BIND already exists."
       exit 0
     fi
 
-    echo "➕ Adicionando novo bind: $NEW_BIND"
+    echo "➕ Adding new bind: $NEW_BIND"
     binds=("$NEW_BIND")
 
-    echo "♻️  Recriando container com binds atualizados..."
+    echo "♻️  Recreating container with updated binds..."
     run_container "${binds[@]}"
 
-    echo "✅ Novo bind aplicado:"
+    echo "✅ New bind applied:"
     printf '  - %s\n' "${binds[@]}"
     ;;
 
   expose)
       if [[ "$2" == "on" ]]; then
-          echo "🌐 Ativando host network..."
+          echo "🌐 Enabling host network..."
           export HOST_EXPOSED=on
           run_container
-          echo "✅ Container agora está usando host network. Binds serão ignorados."
-          echo "⚠️  Host network ativa, todos os binds de porta serão ignorados."
+          echo "✅ Container is now using host network. Binds will be ignored."
+          echo "⚠️  Host network active, all port binds will be ignored."
       elif [[ "$2" == "off" ]]; then
-          echo "🌐 Desativando host network..."
+          echo "🌐 Disabling host network..."
           export HOST_EXPOSED=off
           run_container
-          echo "✅ Container agora usa binds normais."
+          echo "✅ Container now uses normal binds."
       else
-          echo "❌ Uso incorreto: snx expose on|off"
+          echo "❌ Incorrect usage: snx expose on|off"
           exit 1
       fi
       ;;
 
-
   ports)
     ensure_container_exists
 
-    echo "🔎 Binds atuais do container '${CONTAINER_NAME}':"
+    echo "🔎 Current binds for container '${CONTAINER_NAME}':"
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
 
-    # Adiciona SSH_BIND se ainda não estiver presente
+    # Add SSH_BIND if not present
     if [[ -n "$SSH_BIND" && ! " ${current_binds[*]} " =~ " ${SSH_BIND} " ]]; then
       current_binds=("$SSH_BIND" "${current_binds[@]}")
     fi
 
-    # Mantém todos os binds como estão, sem filtrar
-    # current_binds=("${current_binds[@]}")
-
-
     if [ ${#current_binds[@]} -eq 0 ]; then
-      echo "⚠️  Nenhum bind configurado."
+      echo "⚠️  No binds configured."
     else
       for b in "${current_binds[@]}"; do
         host_port="${b%%:*}"
@@ -356,33 +346,33 @@ case "$1" in
 
   logs)
     ensure_container_exists
-    echo "📜 Exibindo logs de ${CONTAINER_NAME}..."
+    echo "📜 Showing logs of ${CONTAINER_NAME}..."
     docker logs "${CONTAINER_NAME}"
     ;;
 
-    status)
-      echo "🩺 Status do container '${CONTAINER_NAME}'"
+  status)
+      echo "🩺 Status of container '${CONTAINER_NAME}'"
       echo "-------------------------------------"
 
-      # Detecta configuração atual (mesmo sem container)
-      echo "🧩 Imagem planejada: ${IMAGE_NAME}"
-      echo "⚙️  Porta SSH planejada: ${SSH_BIND:-2222}"
+      # Detect planned configuration (even without container)
+      echo "🧩 Planned image: ${IMAGE_NAME}"
+      echo "⚙️  Planned SSH port: ${SSH_BIND:-2222}"
 
-      # Determina se a rede host está habilitada
+      # Determine if host network is enabled
       if [[ "${HOST_EXPOSED}" == "on" ]]; then
-        echo "🌐 Modo de rede planejado: host"
+        echo "🌐 Planned network mode: host"
       else
-        echo "🌐 Modo de rede planejado: bridge"
+        echo "🌐 Planned network mode: bridge"
       fi
 
       if ! container_exists; then
         echo ""
-        echo "🔴 Container ainda não existe."
-        echo "💡 Use 'snx connect' para criá-lo."
+        echo "🔴 Container does not exist yet."
+        echo "💡 Use 'snx connect' to create it."
         exit 0
       fi
 
-      # Container existe — coleta detalhes reais
+      # Container exists — collect real details
       running=$(docker inspect -f '{{.State.Running}}' "${CONTAINER_NAME}" 2>/dev/null)
       image=$(docker inspect -f '{{.Config.Image}}' "${CONTAINER_NAME}" 2>/dev/null)
       network_mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}" 2>/dev/null)
@@ -392,28 +382,28 @@ case "$1" in
 
       echo ""
       if [[ "$running" == "true" ]]; then
-        echo "🟢 Status: RODANDO"
+        echo "🟢 Status: RUNNING"
       else
-        echo "🟠 Status: EXISTE, mas está PARADO"
+        echo "🟠 Status: EXISTS, but STOPPED"
       fi
 
-      echo "🧩 Imagem em uso: ${image:-desconhecida}"
-      echo "🌐 Modo de rede real: ${network_mode:-desconhecido}"
-      echo "📅 Criado em: ${created_at:-desconhecido}"
+      echo "🧩 Image in use: ${image:-unknown}"
+      echo "🌐 Real network mode: ${network_mode:-unknown}"
+      echo "📅 Created at: ${created_at:-unknown}"
 
       if [[ -n "$ip_addr" ]]; then
-        echo "🧠 IP do container: ${ip_addr}"
+        echo "🧠 Container IP: ${ip_addr}"
       fi
 
       echo ""
-      echo "🔎 Portas expostas:"
+      echo "🔎 Exposed ports:"
       mapfile -t binds < <(get_current_binds | grep -v '^$')
 
       if [[ ${#binds[@]} -eq 0 ]]; then
         if [[ "$network_mode" == "host" ]]; then
-          echo "  ⚠️  Nenhum bind (modo host ativo)."
+          echo "  ⚠️  No binds (host mode active)."
         else
-          echo "  ⚠️  Nenhuma porta exposta."
+          echo "  ⚠️  No ports exposed."
         fi
       else
         for b in "${binds[@]}"; do
@@ -424,25 +414,21 @@ case "$1" in
       fi
 
       echo ""
-      echo "🗂  Montagens:"
+      echo "🗂  Mounts:"
       if [[ -z "$mounts" ]]; then
-        echo "  ⚠️  Nenhum volume montado."
+        echo "  ⚠️  No volumes mounted."
       else
         echo "$mounts" | sed 's/^/  - /'
       fi
       ;;
-
-
-
-
 
   --help|-h)
     show_help
     ;;
 
   *)
-    echo "❌ Opção inválida: $1"
-    echo "Use 'snx --help' para ver as opções disponíveis."
+    echo "❌ Invalid option: $1"
+    echo "Use 'snx --help' to see available options."
     exit 1
     ;;
 esac
