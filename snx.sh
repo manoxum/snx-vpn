@@ -4,17 +4,22 @@ set -e
 cd "$(dirname "$(readlink -f "$0")")"
 
 ENV_FILE=".env.local"
-get_env_var() {
-  local var_name="$1"
-  grep -E "^${var_name}=" "${ENV_FILE}" 2>/dev/null | tail -n1 | cut -d '=' -f2-
-}
+# ----------------------------------------
+# Carrega variáveis do arquivo .env.local
+# ----------------------------------------
+if [[ -f "${ENV_FILE}" ]]; then
+  # Exporta todas as variáveis declaradas dentro do arquivo
+  set -o allexport
+  source "${ENV_FILE}"
+  set +o allexport
+else
+  echo "⚠️  Arquivo ${ENV_FILE} não encontrado. Usando valores padrão."
+fi
 
-SNX_NAME=$(get_env_var "SNX_NAME")
-SNX_IMAGE=$(get_env_var "SNX_IMAGE")
-SNX_SSH_BIND=$(get_env_var "SNX_SSH_BIND")
-CONTAINER_NAME=${SNX_NAME:-snx}
-IMAGE_NAME=${SNX_IMAGE:-snx}
-SSH_BIND=${SNX_SSH_BIND:-"2222"}
+# Define variáveis com fallback
+CONTAINER_NAME="${SNX_NAME:-snx}"
+IMAGE_NAME="${SNX_IMAGE:-snx}"
+SSH_BIND="${SNX_SSH_BIND:-2222}"
 
 # -------------------------
 # Funções auxiliares
@@ -78,15 +83,18 @@ local new_binds=("$@")       # argumentos passados para a função
   done
 
 
-  # Garante SSH_BIND válido
-  if [[ -z "$SSH_BIND" ]]; then
-    echo "⚠️  Variável SSH_BIND não definida em ${ENV_FILE}, usando 2222:22 por padrão."
-    SSH_BIND="2222:22"
-  fi
-  if [[ ! "$SSH_BIND" =~ ^[0-9]+$ ]]; then
-    echo "❌ SSH_BIND inválido em ${ENV_FILE}. Use o formato HOST:CONTAINER (ex: 2222:22)."
-    exit 1
-  fi
+   # Validação e fallback de SSH_BIND
+   if [[ -z "$SSH_BIND" ]]; then
+     echo "⚠️  Variável SNX_SSH_BIND não definida em ${ENV_FILE}, usando 2222 por padrão."
+     SSH_BIND=2222
+   fi
+   if [[ ! "$SSH_BIND" =~ ^[0-9]+$ ]]; then
+     echo "❌ Valor inválido para SNX_SSH_BIND em ${ENV_FILE}. Use apenas o número da porta externa (ex: 2222)."
+     exit 1
+   fi
+
+   # Monta o bind SSH completo
+   local ssh_port_bind="${SSH_BIND}:22"
 
   # Normaliza binds atuais
   normalized_binds=()
@@ -94,9 +102,9 @@ local new_binds=("$@")       # argumentos passados para a função
     normalized_binds+=("${b%%/*}")
   done
 
-  # Adiciona SSH_BIND se ainda não estiver presente
-  if [[ ! " ${normalized_binds[*]} " =~ " ${SSH_BIND} " ]]; then
-    binds=("$SSH_BIND:22" "${binds[@]}")
+  # Adiciona o bind SSH se ainda não existir
+  if [[ ! " ${normalized_binds[*]} " =~ " ${SSH_BIND}:" ]]; then
+    binds=("$ssh_port_bind" "${binds[@]}")
   fi
 
   # Remove duplicatas de forma segura
@@ -143,7 +151,7 @@ local new_binds=("$@")       # argumentos passados para a função
     docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
   fi
 
-  docker run --rm -it \
+  docker run --rm \
     --privileged \
     --cap-add=NET_ADMIN \
     "${ports_args[@]}" \
@@ -288,8 +296,7 @@ case "$1" in
     mapfile -t current_binds < <(get_current_binds | grep -v '^$')
 
     # Adiciona SSH_BIND se ainda não estiver presente
-    SSH_BIND=$(get_env_var "SSH_BIND")
-    if [[ -n "$SSH_BIND" && ! " ${current_binds[*]} " =~ " $SSH_BIND " ]]; then
+    if [[ -n "$SSH_BIND" && ! " ${current_binds[*]} " =~ " ${SSH_BIND} " ]]; then
       current_binds=("$SSH_BIND" "${current_binds[@]}")
     fi
 
