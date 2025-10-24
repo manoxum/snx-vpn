@@ -31,8 +31,10 @@ container_exists() {
 }
 
 get_current_binds() {
-  docker inspect "${CONTAINER_NAME}" \
-    --format '{{range $p, $conf := .HostConfig.PortBindings}}{{range $conf}}{{.HostPort}}:{{$p}}{{"\n"}}{{end}}{{end}}' 2>/dev/null || true
+docker inspect "${CONTAINER_NAME}" \
+  --format '{{json .HostConfig.PortBindings}}' \
+  | jq -r 'to_entries[] | "\(.value[0].HostPort):\(.key)"'
+
 }
 
 
@@ -151,7 +153,7 @@ local new_binds=("$@")       # argumentos passados para a função
     docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
   fi
 
-  docker run --rm \
+  docker run --rm -it \
     --privileged \
     --cap-add=NET_ADMIN \
     "${ports_args[@]}" \
@@ -320,6 +322,80 @@ case "$1" in
     echo "📜 Exibindo logs de ${CONTAINER_NAME}..."
     docker logs "${CONTAINER_NAME}"
     ;;
+
+    status)
+      echo "🩺 Status do container '${CONTAINER_NAME}'"
+      echo "-------------------------------------"
+
+      # Detecta configuração atual (mesmo sem container)
+      echo "🧩 Imagem planejada: ${IMAGE_NAME}"
+      echo "⚙️  Porta SSH planejada: ${SSH_BIND:-2222}"
+
+      # Determina se a rede host está habilitada
+      if [[ "${HOST_EXPOSED}" == "on" ]]; then
+        echo "🌐 Modo de rede planejado: host"
+      else
+        echo "🌐 Modo de rede planejado: bridge"
+      fi
+
+      if ! container_exists; then
+        echo ""
+        echo "🔴 Container ainda não existe."
+        echo "💡 Use 'snx connect' para criá-lo."
+        exit 0
+      fi
+
+      # Container existe — coleta detalhes reais
+      running=$(docker inspect -f '{{.State.Running}}' "${CONTAINER_NAME}" 2>/dev/null)
+      image=$(docker inspect -f '{{.Config.Image}}' "${CONTAINER_NAME}" 2>/dev/null)
+      network_mode=$(docker inspect -f '{{.HostConfig.NetworkMode}}' "${CONTAINER_NAME}" 2>/dev/null)
+      created_at=$(docker inspect -f '{{.Created}}' "${CONTAINER_NAME}" 2>/dev/null | cut -d'.' -f1 | sed 's/T/ /')
+      ip_addr=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${CONTAINER_NAME}" 2>/dev/null)
+      mounts=$(docker inspect -f '{{range .Mounts}}{{println .Source "→" .Destination}}{{end}}' "${CONTAINER_NAME}" 2>/dev/null)
+
+      echo ""
+      if [[ "$running" == "true" ]]; then
+        echo "🟢 Status: RODANDO"
+      else
+        echo "🟠 Status: EXISTE, mas está PARADO"
+      fi
+
+      echo "🧩 Imagem em uso: ${image:-desconhecida}"
+      echo "🌐 Modo de rede real: ${network_mode:-desconhecido}"
+      echo "📅 Criado em: ${created_at:-desconhecido}"
+
+      if [[ -n "$ip_addr" ]]; then
+        echo "🧠 IP do container: ${ip_addr}"
+      fi
+
+      echo ""
+      echo "🔎 Portas expostas:"
+      mapfile -t binds < <(get_current_binds | grep -v '^$')
+
+      if [[ ${#binds[@]} -eq 0 ]]; then
+        if [[ "$network_mode" == "host" ]]; then
+          echo "  ⚠️  Nenhum bind (modo host ativo)."
+        else
+          echo "  ⚠️  Nenhuma porta exposta."
+        fi
+      else
+        for b in "${binds[@]}"; do
+          host_port="${b%%:*}"
+          container_port="${b##*:}"
+          echo "  - ${host_port} → ${container_port}"
+        done
+      fi
+
+      echo ""
+      echo "🗂  Montagens:"
+      if [[ -z "$mounts" ]]; then
+        echo "  ⚠️  Nenhum volume montado."
+      else
+        echo "$mounts" | sed 's/^/  - /'
+      fi
+      ;;
+
+
 
 
 
