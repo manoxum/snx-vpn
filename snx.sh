@@ -171,9 +171,10 @@ local new_binds=("$@")       # argumentos passados para a função
 # -------------------------
 show_help() {
   cat <<EOF
-Uso: snx [opção]
+Uso: snx [comando] [opções]
 
 Comandos disponíveis:
+
   snx                     Abre um shell bash dentro do container '${CONTAINER_NAME}'
   snx connect|start|init  Inicializa e cria o container do zero
   snx reconnect|restart   Remove e recria o container
@@ -183,17 +184,53 @@ Comandos disponíveis:
   snx expose on|off       Ativa ou desativa host network (ignora binds se ON)
   snx ports               Mostra todos os binds de portas configuradas
   snx logs                Exibe os logs do container
+  snx status              Mostra informações detalhadas sobre o container
   snx --help|-h           Mostra esta mensagem de ajuda
 
 Exemplos:
-  snx                     Abre um shell bash dentro do container
-  snx connect              Cria o container caso não exista
-  snx reconnect            Reinicia o container do zero
-  snx stop                 Para e remove o container
-  snx ssh user@10.0.0.5   Executa SSH dentro do container
-  snx bind 8080:80         Adiciona um bind de porta adicional
-  snx expose on            Ativa host network (binds serão ignorados)
-  snx expose off           Volta a usar binds normais
+
+  snx
+      Abre um shell bash dentro do container.
+
+  snx connect
+      Cria o container caso não exista.
+
+  snx reconnect
+      Reinicia o container do zero.
+
+  snx stop
+      Para e remove o container.
+
+  snx ssh user@10.0.0.5
+      Executa SSH dentro do container.
+
+  snx bind 8080:80
+      Adiciona um bind de porta adicional.
+
+  snx expose on
+      Ativa host network (binds serão ignorados).
+
+  snx expose off
+      Volta a usar binds normais.
+
+  snx ports
+      Lista todas as portas configuradas atualmente.
+
+  snx logs
+      Exibe logs do container.
+
+  snx status
+      Exibe detalhes completos do container, incluindo:
+        - Imagem em uso
+        - Status de execução
+        - Rede e portas expostas
+        - Montagens de volumes
+
+Notas:
+  - Todas as variáveis do arquivo '.env.local' são carregadas automaticamente.
+  - SNX_SSH_BIND define a porta SSH externa (padrão: 2222).
+  - HOST_EXPOSED controla se o container usa host network (ignora binds se 'on').
+
 EOF
 }
 
