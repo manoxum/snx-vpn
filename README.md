@@ -1,8 +1,6 @@
 # SNX VPN Container Manager 🚀
 
-&#x20;
-
-Um utilitário simples para gerenciar o container `snx-vpn` via Docker, com suporte a binds de portas, SSH e logs.
+Gerencie facilmente seu container `snx-vpn` via Docker com suporte a binds de portas dinâmicos, SSH interno e logs detalhados.
 
 ---
 
@@ -11,8 +9,8 @@ Um utilitário simples para gerenciar o container `snx-vpn` via Docker, com supo
 1. Clone ou baixe este repositório:
 
 ```bash
-git clone <repo-url>
-cd <repo-folder>
+git clone https://github.com/manoxum/snx-vpn.git
+cd snx-vpn
 ```
 
 2. Execute o script de instalação:
@@ -21,107 +19,130 @@ cd <repo-folder>
 ./install.sh
 ```
 
-O script fará:
+O script irá:
 
-- 🛠 Construir a imagem Docker `snx-vpn`.
-- 🔓 Tornar o script `snx.sh` executável.
-- 🔗 Criar um link simbólico em `~/.local/bin/snx` para uso global.
+* 🛠 Construir a imagem Docker `snx-vpn`.
+* 🔓 Tornar `snx.sh` executável.
+* 🔗 Criar link simbólico em `~/.local/bin/snx` para uso global.
 
 > ⚠️ Certifique-se de que `~/.local/bin` esteja no seu PATH:
 >
-> ```bash
-> ```
+> Se o diretório não estiver no PATH, adicione-o adicionando a seguinte linha ao seu arquivo `~/.bashrc` ou `~/.zshrc`:
 
-echo \$PATH
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
 
-> ```
-> ```
+> Depois, recarregue o shell ou execute `source ~/.bashrc` (ou `source ~/.zshrc`).
+
+```bash
+echo $PATH
+```
 
 ---
 
 ## 🚀 Uso
 
-Após a instalação, utilize o comando `snx` para gerenciar o container.
+Use o comando `snx` para gerenciar o container.
 
 ### 📋 Comandos disponíveis
 
-| Comando                                  | Descrição                                                                     |
-| ---------------------------------------- | ----------------------------------------------------------------------------- |
-| `snx`                                    | Abre um shell Bash dentro do container `snx-vpn`.                             |
-| `snx connect` / `snx start` / `snx init` | Inicializa e cria o container caso ainda não exista.                          |
-| `snx reconnect` / `snx restart`          | Remove e recria o container, preservando binds configurados.                  |
-| `snx stop` / `snx disconnect`            | Para e remove o container `snx-vpn`.                                          |
-| `snx ssh <args...>`                      | Executa um comando SSH dentro do container. Ex: `snx ssh user@10.0.0.5`.      |
-| `snx bind A:B`                           | Adiciona um novo bind de porta (ex: `snx bind 8080:80`) e recria o container. |
-| `snx ports`                              | Lista todos os binds de portas atuais do container.                           |
-| `snx logs`                               | Exibe os logs do container `snx-vpn`.                                         |
-| `snx --help`                             | Mostra esta mensagem de ajuda detalhada.                                      |
+| Comando                    | Descrição                                                        |
+| -------------------------- | ---------------------------------------------------------------- |
+| `snx`                      | Abre um shell Bash dentro do container `snx-vpn`.                |
+| `snx connect\|start\|init` | Inicializa e cria o container se não existir.                    |
+| `snx reconnect\|restart`   | Remove e recria o container com binds existentes.                |
+| `snx stop\|disconnect`     | Para e remove o container.                                       |
+| `snx ssh <args...>`        | Executa um comando SSH no container. Ex: `snx ssh user@10.0.0.5` |
+| `snx bind A:B`             | Adiciona um bind de porta e recria o container.                  |
+| `snx expose on\|off`       | Ativa/desativa rede host (ignora binds se `on`).                 |
+| `snx ports`                | Lista todos os binds de portas atuais.                           |
+| `snx logs`                 | Exibe os logs do container.                                      |
+| `snx status`               | Mostra informações detalhadas (imagem, portas, mounts, status).  |
+| `snx --help\|-h`           | Mostra ajuda detalhada.                                          |
 
 ---
 
 ## ⚙️ Configuração
 
-O script lê a variável `SSH_BIND` do arquivo `.env.local`:
+O container carrega variáveis de `.env.local`:
 
 ```env
-SSH_BIND=2222:22
+SNX_SSH_BIND=2222
 ```
 
-- Formato: `HOST_PORT:CONTAINER_PORT`
-- Usada para mapear a porta SSH do host para o container.
+* `HOST_PORT:CONTAINER_PORT` para SSH.
+* Configure usuário/senha SSH, nome da imagem e do container.
+
+Exemplo de `.env.local`:
+
+```env
+SNX_VPN_USERNAME=testuser
+SNX_VPN_PASSWORD=secret123
+SNX_VPN_GETWAI=vpn.example.com
+SNX_SSH_USER=jumphost
+SNX_SSH_PASSWORD=password123
+SNX_SSH_BIND=2222
+SNX_IMAGE=snx
+SNX_NAME=snx
+```
 
 ---
 
 ## 💡 Exemplos de uso
 
-- Abrir bash no container:
-
 ```bash
-snx
-```
-
-- Reconectar/recriar o container:
-
-```bash
-snx reconnect
-```
-
-- Adicionar um novo bind de porta:
-
-```bash
-snx bind 8080:80
-```
-
-- Listar todas as portas expostas:
-
-```bash
-snx ports
-```
-
-- Conectar via SSH dentro do container:
-
-```bash
-snx ssh user@10.0.0.5
-```
-
-- Visualizar logs:
-
-```bash
-snx logs
-```
-
-- Parar o container:
-
-```bash
-snx stop
+snx                  # Abrir shell no container
+snx connect           # Criar container se não existir
+snx reconnect         # Recriar container
+snx stop              # Parar container
+snx ssh user@10.0.0.5 # Executar SSH
+snx bind 8080:80      # Adicionar bind de porta
+snx expose on         # Ativar rede host
+snx expose off        # Desativar rede host
+snx ports             # Listar portas
+snx logs              # Ver logs
+snx status            # Status completo do container
 ```
 
 ---
 
 ## 🛠 Recursos
 
-- Container Docker leve e rápido
-- Bind dinâmico de portas
-- SSH interno fácil
-- Logs acessíveis
-- Recriação segura do container
+* Container Docker leve e rápido
+* Bind de portas dinâmico
+* SSH interno configurável
+* Logs detalhados e acessíveis
+* Recriação segura do container
+* Rede host opcional
+* Configuração simples via `.env.local`
+
+---
+
+## ⚠️ Notas
+
+* Variáveis do `.env.local` são carregadas automaticamente.
+* `SNX_SSH_BIND` define a porta SSH externa (default: 2222).
+* `HOST_EXPOSED` controla uso da rede host (ignora binds se `on`).
+* Sempre use `snx status` para verificar o container.
+
+---
+
+## 📝 Estrutura do Projeto
+
+```
+├── app/                     # Scripts e binários do container
+│   ├── bin/                 # Entrypoints e scripts auxiliares
+│   └── lib/                 # Scripts de instalação VPN
+├── Dockerfile               # Imagem base e setup
+├── install.sh               # Script de instalação e build
+├── snx.sh                   # Script principal de gerenciamento
+├── .env.local               # Variáveis de configuração (exemplo)
+└── README.md
+```
+
+---
+
+Gerencie seu VPN container de forma segura e prática, com SSH interno, binds dinâmicos e suporte completo a logs e status.
+
+Para mais informações, acesse o repositório oficial: [https://github.com/manoxum/snx-vpn](https://github.com/manoxum/snx-vpn)
