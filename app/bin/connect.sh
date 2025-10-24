@@ -59,9 +59,3 @@ ip route show | grep "${VPN_IFACE:-}" || echo "No routes detected for VPN interf
 
 echo "INFO: VPN is fully ready."
 
-sleep 2
-/usr/sbin/sshd
-
-
-exec "$@"
-

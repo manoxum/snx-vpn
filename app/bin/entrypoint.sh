@@ -28,4 +28,8 @@ fi
 # Continua com a VPN
 /app/bin/connect.sh
 
+# Iniciar o serviço ssh
+sleep 2
+/usr/sbin/sshd
+
 exec "$@"
