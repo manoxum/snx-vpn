@@ -1,0 +1,38 @@
+#compdef snx
+
+_snx() {
+  local -a commands
+  commands=(
+    'install:Install or reinstall SNX and rebuild without cache'
+    'build:Alias for install'
+    'rebuild:Alias for install'
+    'reinstall:Alias for install'
+    'uninstall:Remove SNX while preserving repository and env files'
+    'connect:Create and start the VPN container'
+    'start:Alias for connect'
+    'init:Alias for connect'
+    'reconnect:Recreate the container'
+    'restart:Alias for reconnect'
+    'stop:Stop and remove the container'
+    'disconnect:Alias for stop'
+    'ssh:Run SSH inside the container'
+    'bind:Add a port mapping'
+    'expose:Enable or disable host network'
+    'ports:Show port mappings'
+    'logs:Show container logs'
+    'status:Show container status'
+    '--help:Show help'
+    '-h:Show help'
+  )
+
+  case "$CURRENT" in
+    2) _describe 'command' commands ;;
+    3)
+      if [[ "${words[2]}" == expose ]]; then
+        _values 'network mode' on off
+      fi
+      ;;
+  esac
+}
+
+compdef _snx snx

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-cd "$(dirname "$(readlink -f "$0")")"
+PROJECT_DIR="$(dirname "$(readlink -f "$0")")"
+cd "${PROJECT_DIR}"
 
 ENV_FILE=".env.local"
 # ----------------------------------------
@@ -20,21 +21,159 @@ fi
 CONTAINER_NAME="${SNX_NAME:-snx}"
 IMAGE_NAME="${SNX_IMAGE:-snx}"
 SSH_BIND="${SNX_SSH_BIND:-2222}"
+INSTALL_LINK="${HOME}/.local/bin/snx"
+IMAGE_LABEL="io.snx-vpn.image=${IMAGE_NAME}"
+COMPLETION_DIR="${HOME}/.local/share/snx/completions"
+
+# Remove only the block added by this installer, keeping other shell settings.
+remove_completion_block() {
+  local rc_file="$1"
+  [[ -f "${rc_file}" ]] || return 0
+  if ! grep -qx '# >>> snx completion >>>' "${rc_file}"; then
+    return 0
+  fi
+  if ! grep -qx '# <<< snx completion <<<' "${rc_file}"; then
+    echo "❌ Incomplete SNX completion block in '${rc_file}'."
+    return 1
+  fi
+
+  local temp_file
+  temp_file=$(mktemp "${rc_file}.snx.XXXXXX")
+  if ! awk '
+    $0 == "# >>> snx completion >>>" { skip = 1; next }
+    $0 == "# <<< snx completion <<<" { skip = 0; next }
+    !skip { print }
+  ' "${rc_file}" > "${temp_file}"; then
+    rm -f "${temp_file}"
+    return 1
+  fi
+  if ! cat "${temp_file}" > "${rc_file}"; then
+    rm -f "${temp_file}"
+    return 1
+  fi
+  rm -f "${temp_file}"
+}
+
+install_completions() {
+  mkdir -p "${COMPLETION_DIR}"
+  cp "${PROJECT_DIR}/completions/snx.bash" "${COMPLETION_DIR}/snx.bash"
+  cp "${PROJECT_DIR}/completions/_snx" "${COMPLETION_DIR}/_snx"
+
+  remove_completion_block "${HOME}/.bashrc"
+  if [[ -s "${HOME}/.bashrc" && -n "$(tail -c 1 "${HOME}/.bashrc")" ]]; then
+    printf '\n' >> "${HOME}/.bashrc"
+  fi
+  cat >> "${HOME}/.bashrc" <<'EOF'
+# >>> snx completion >>>
+if [[ -r "$HOME/.local/share/snx/completions/snx.bash" ]]; then
+  source "$HOME/.local/share/snx/completions/snx.bash"
+fi
+# <<< snx completion <<<
+EOF
+
+  remove_completion_block "${HOME}/.zshrc"
+  if [[ -s "${HOME}/.zshrc" && -n "$(tail -c 1 "${HOME}/.zshrc")" ]]; then
+    printf '\n' >> "${HOME}/.zshrc"
+  fi
+  cat >> "${HOME}/.zshrc" <<'EOF'
+# >>> snx completion >>>
+if [[ -r "$HOME/.local/share/snx/completions/_snx" ]]; then
+  if (( ! $+functions[compdef] )); then
+    autoload -Uz compinit
+    compinit
+  fi
+  source "$HOME/.local/share/snx/completions/_snx"
+fi
+# <<< snx completion <<<
+EOF
+}
 
 # -------------------------
 # Helper functions
 # -------------------------
+
+build_image() {
+  echo "🛠️  Building image '${IMAGE_NAME}'..."
+  if ! docker build "$@" --label "${IMAGE_LABEL}" -t "${IMAGE_NAME}" .; then
+    echo "❌ Failed to build image '${IMAGE_NAME}'."
+    exit 1
+  fi
+}
 
 ensure_image_exists() {
   if docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
     return 0
   fi
 
-  echo "🛠️  Image '${IMAGE_NAME}' not found locally. Building..."
-  if ! docker build -t "${IMAGE_NAME}" .; then
-    echo "❌ Failed to build image '${IMAGE_NAME}'."
-    exit 1
+  echo "🛠️  Image '${IMAGE_NAME}' not found locally."
+  build_image
+}
+
+install_snx() {
+  # Refuse to overwrite a command belonging to another installation.
+  if [[ -e "${INSTALL_LINK}" || -L "${INSTALL_LINK}" ]]; then
+    if [[ ! -L "${INSTALL_LINK}" || "$(readlink -f "${INSTALL_LINK}")" != "${PROJECT_DIR}/snx.sh" ]]; then
+      echo "❌ '${INSTALL_LINK}' already exists and belongs to another installation."
+      exit 1
+    fi
   fi
+
+  build_image --no-cache
+  chmod +x "${PROJECT_DIR}/snx.sh"
+  mkdir -p "$(dirname "${INSTALL_LINK}")"
+  ln -sfn "${PROJECT_DIR}/snx.sh" "${INSTALL_LINK}"
+  install_completions
+
+  if container_exists; then
+    local HOST_EXPOSED=off
+    if is_host_network; then
+      HOST_EXPOSED=on
+    fi
+    run_container
+  fi
+
+  echo "✅ SNX installed at '${INSTALL_LINK}'."
+  echo "💡 Use 'snx connect' to start the VPN if no container is running."
+  echo "💡 Open a new terminal or reload ~/.bashrc (Bash) / ~/.zshrc (Zsh) to enable tab completion."
+}
+
+uninstall_snx() {
+  # Check the daemon before deleting any part of the installation.
+  docker info >/dev/null
+
+  if container_exists; then
+    echo "🛑 Removing container '${CONTAINER_NAME}' and its temporary data..."
+    docker rm -fv "${CONTAINER_NAME}"
+  fi
+
+  if docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
+    echo "🗑️  Removing image '${IMAGE_NAME}'..."
+    docker image rm "${IMAGE_NAME}"
+  fi
+
+  # Only clean old, untagged SNX builds; Docker's shared cache is not pruned.
+  local old_images
+  old_images=$(docker image ls -aq --filter dangling=true --filter "label=${IMAGE_LABEL}")
+  if [[ -n "${old_images}" ]]; then
+    local image_ids=()
+    mapfile -t image_ids <<< "${old_images}"
+    docker image rm "${image_ids[@]}"
+  fi
+
+  if [[ -L "${INSTALL_LINK}" && "$(readlink -f "${INSTALL_LINK}")" == "${PROJECT_DIR}/snx.sh" ]]; then
+    rm "${INSTALL_LINK}"
+  fi
+
+  remove_completion_block "${HOME}/.bashrc"
+  remove_completion_block "${HOME}/.zshrc"
+  rm -f "${COMPLETION_DIR}/snx.bash" "${COMPLETION_DIR}/_snx"
+  if [[ -d "${COMPLETION_DIR}" ]]; then
+    rmdir "${COMPLETION_DIR}" 2>/dev/null || true
+    rmdir "$(dirname "${COMPLETION_DIR}")" 2>/dev/null || true
+  fi
+
+  echo "✅ SNX uninstalled. Repository and environment files preserved at '${PROJECT_DIR}'."
+  echo "💡 Run './install.sh' from the repository to install again."
 }
 
 container_exists() {
@@ -42,10 +181,10 @@ container_exists() {
 }
 
 get_current_binds() {
-docker inspect "${CONTAINER_NAME}" \
-  --format '{{json .HostConfig.PortBindings}}' \
-  | jq -r 'to_entries[] | "\(.value[0].HostPort):\(.key)"'
-
+  local port_bindings
+  port_bindings=$(docker inspect "${CONTAINER_NAME}" \
+    --format '{{json .HostConfig.PortBindings}}') || return 1
+  jq -r '. // {} | to_entries[] | "\(.value[0].HostPort):\(.key)"' <<< "${port_bindings}"
 }
 
 
@@ -89,7 +228,12 @@ local new_binds=("$@")       # arguments passed to the function
 
   if container_exists; then
     # Get old binds
-    mapfile -t binds < <(get_current_binds | grep -v '^$')
+    local current_binds
+    if ! current_binds=$(get_current_binds); then
+      echo "❌ Failed to read existing port bindings. Container preserved. Check Docker and jq."
+      exit 1
+    fi
+    mapfile -t binds < <(printf '%s\n' "${current_binds}" | grep -v '^$')
   fi
 
   # Add new binds passed as parameters
@@ -185,6 +329,9 @@ Usage: snx [command] [options]
 Available commands:
 
   snx                     Open a bash shell inside container '${CONTAINER_NAME}'
+  snx install             Install/reinstall SNX, rebuild without cache and recreate an existing container
+  snx build|rebuild|reinstall  Aliases for 'snx install'
+  snx uninstall           Remove the container, SNX images and command link; keep repository and env files
   snx connect|start|init  Initialize and create the container from scratch
   snx reconnect|restart   Remove and recreate the container
   snx stop|disconnect     Stop and remove the container
@@ -197,6 +344,12 @@ Available commands:
   snx --help|-h           Show this help message
 
 Examples:
+
+  snx install
+      Rebuild without cache and install the command; preserve existing ports and network mode.
+
+  snx uninstall
+      Remove the installation and container temporary data; keep repository and environment files.
 
   snx
       Open a bash shell inside the container.
@@ -237,6 +390,7 @@ Examples:
 
 Notes:
   - Missing Docker images are built automatically before creating the container.
+  - 'snx install' enables tab completion for Bash and Zsh after reloading the shell.
   - All variables from '.env.local' are automatically loaded.
   - SNX_SSH_BIND defines the external SSH port (default: 2222).
   - HOST_EXPOSED controls whether the container uses host network (ignores binds if 'on').
@@ -250,6 +404,14 @@ EOF
 cd "$(dirname "$(readlink -f "$0")")"
 
 case "$1" in
+  install|build|rebuild|reinstall)
+    install_snx
+    ;;
+
+  uninstall)
+    uninstall_snx
+    ;;
+
   "")
     ensure_container_exists
     echo "🔗 Connecting to container ${CONTAINER_NAME} via bash..."

@@ -21,9 +21,14 @@ cd snx-vpn
 
 O script irá:
 
-* 🛠 Construir a imagem Docker definida em `SNX_IMAGE` (padrão: `snx`).
+* 🛠 Reconstruir sem cache a imagem Docker definida em `SNX_IMAGE` (padrão: `snx`).
 * 🔓 Tornar `snx.sh` executável.
 * 🔗 Criar link simbólico em `~/.local/bin/snx` para uso global.
+* ⌨️ Instalar autocomplete para Bash e Zsh.
+* ♻️ Recriar o container se ele já existir, mantendo portas e modo de rede.
+
+O `install.sh` usa o mesmo fluxo de `snx install`. O build precisa concluir com
+sucesso antes de atualizar a instalação ou recriar um container existente.
 
 > ⚠️ Certifique-se de que `~/.local/bin` esteja no seu PATH:
 >
@@ -55,6 +60,9 @@ Se o build falhar, o comando para sem remover o container existente.
 | Comando                    | Descrição                                                        |
 | -------------------------- | ---------------------------------------------------------------- |
 | `snx`                      | Abre um shell Bash dentro do container `snx-vpn`.                |
+| `snx install`              | Instala/reinstala o comando, reconstrói a imagem sem cache e recria um container existente. |
+| `snx build\|rebuild\|reinstall` | Aliases de `snx install`.                                    |
+| `snx uninstall`            | Remove a instalação, o container e as imagens do SNX, mantendo repositório e envs. |
 | `snx connect\|start\|init` | Inicializa e cria o container se não existir.                    |
 | `snx reconnect\|restart`   | Remove e recria o container com binds existentes.                |
 | `snx stop\|disconnect`     | Para e remove o container.                                       |
@@ -65,6 +73,43 @@ Se o build falhar, o comando para sem remover o container existente.
 | `snx logs`                 | Exibe os logs do container.                                      |
 | `snx status`               | Mostra informações detalhadas (imagem, portas, mounts, status).  |
 | `snx --help\|-h`           | Mostra ajuda detalhada.                                          |
+
+---
+
+## ⌨️ Autocomplete
+
+O autocomplete é instalado por `./install.sh` ou `snx install`. Abra um novo
+terminal ou recarregue a configuração do seu shell:
+
+```bash
+source ~/.bashrc  # Bash
+# ou: source ~/.zshrc  # Zsh
+```
+
+Use `snx <Tab>` para listar os comandos, `snx re<Tab>` para completar os aliases
+de reconstrução/reconexão e `snx expose <Tab>` para escolher `on` ou `off`.
+
+Os arquivos de autocomplete ficam em `~/.local/share/snx/completions`. A
+instalação adiciona um bloco identificado às configurações do shell e atualiza
+esse mesmo bloco nas reinstalações.
+
+## 🗑️ Desinstalação
+
+```bash
+snx uninstall
+```
+
+Esse comando remove:
+
+* O container definido em `SNX_NAME`, incluindo sua camada temporária e volumes anônimos.
+* A imagem definida em `SNX_IMAGE` e imagens antigas sem tag identificadas como builds dessa imagem do SNX.
+* O link `~/.local/bin/snx` quando ele aponta para este repositório.
+* Os arquivos de autocomplete instalados e os blocos de integração em `.bashrc` e `.zshrc`.
+
+A pasta do repositório e todos os seus arquivos, incluindo `.env`, `.env.local`
+e outros envs, são preservados. O cache compartilhado do Docker e recursos de
+outros projetos são mantidos. Após desinstalar, execute `./install.sh` na pasta
+do repositório para instalar novamente.
 
 ---
 
@@ -98,6 +143,9 @@ SNX_NAME=snx
 
 ```bash
 snx                  # Abrir shell no container
+snx install           # Instalar/reinstalar e reconstruir sem cache
+snx rebuild           # Alias de install
+snx uninstall         # Remover instalação, mantendo repositório e envs
 snx connect           # Criar container se não existir
 snx reconnect         # Recriar container
 snx stop              # Parar container
@@ -140,6 +188,7 @@ snx status            # Status completo do container
 │   ├── bin/                 # Entrypoints e scripts auxiliares
 │   └── lib/                 # Scripts de instalação VPN
 ├── Dockerfile               # Imagem base e setup
+├── completions/             # Autocomplete para Bash e Zsh
 ├── install.sh               # Script de instalação e build
 ├── snx.sh                   # Script principal de gerenciamento
 ├── .env.local               # Variáveis de configuração (exemplo)
