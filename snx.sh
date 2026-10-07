@@ -25,6 +25,17 @@ SSH_BIND="${SNX_SSH_BIND:-2222}"
 # Helper functions
 # -------------------------
 
+ensure_image_exists() {
+  if docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "🛠️  Image '${IMAGE_NAME}' not found locally. Building..."
+  if ! docker build -t "${IMAGE_NAME}" .; then
+    echo "❌ Failed to build image '${IMAGE_NAME}'."
+    exit 1
+  fi
+}
 
 container_exists() {
   docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"
@@ -71,6 +82,8 @@ unique_binds() {
 # Main run function
 # -------------------------
 run_container() {
+  ensure_image_exists
+
 local new_binds=("$@")       # arguments passed to the function
   local binds=()
 
@@ -223,6 +236,7 @@ Examples:
         - Volume mounts
 
 Notes:
+  - Missing Docker images are built automatically before creating the container.
   - All variables from '.env.local' are automatically loaded.
   - SNX_SSH_BIND defines the external SSH port (default: 2222).
   - HOST_EXPOSED controls whether the container uses host network (ignores binds if 'on').

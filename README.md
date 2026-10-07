@@ -21,7 +21,7 @@ cd snx-vpn
 
 O script irá:
 
-* 🛠 Construir a imagem Docker `snx-vpn`.
+* 🛠 Construir a imagem Docker definida em `SNX_IMAGE` (padrão: `snx`).
 * 🔓 Tornar `snx.sh` executável.
 * 🔗 Criar link simbólico em `~/.local/bin/snx` para uso global.
 
@@ -44,6 +44,11 @@ echo $PATH
 ## 🚀 Uso
 
 Use o comando `snx` para gerenciar o container.
+
+Antes de criar ou recriar o container, o `snx` verifica se a imagem definida em
+`SNX_IMAGE` (padrão: `snx`) existe localmente. Se não existir, executa
+`docker build -t "${SNX_IMAGE:-snx}" .` no diretório do projeto automaticamente.
+Se o build falhar, o comando para sem remover o container existente.
 
 ### 📋 Comandos disponíveis
 
